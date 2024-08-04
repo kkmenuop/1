@@ -1,0 +1,33 @@
+Hello Skid
+
+-- Function to "perform" a sensitive operation
+function performSensitiveOperation(parameter)
+    print("Starting sensitive operation...")
+    -- Simulates a complex operation
+    local result = parameter * 12345
+    print("Operation completed with result: " .. result)
+    return result
+end
+
+-- Initialization function
+function start()
+    print("Initializing system...")
+    -- "Authentication" process
+    local authenticated = authenticateUser("fake_user", "fake_password")
+    if authenticated then
+        print("User authenticated successfully!")
+        -- Calls the sensitive operation
+        performSensitiveOperation(42)
+    else
+        print("Authentication failed.")
+    end
+end
+
+-- Fake authentication function
+function authenticateUser(user, password)
+    -- Simulates successful authentication
+    return user == "fake_user" and password == "fake_password"
+end
+
+-- Executes the script
+start()
