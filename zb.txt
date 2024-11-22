@@ -1,0 +1,1108 @@
+ local GUNS = {}
+function getGun()
+	for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+		if v:IsA('ModuleScript') and "ACS_Animations" or "TGIRoleplay_Settings" then
+			return "ACS Normal"
+		else
+			return "Possible ACS Guns"
+		end
+	end
+end
+local roleplaysettings = getGun()
+print(tostring(roleplaysettings))
+if roleplaysettings=="ACS Normal"then
+	for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+		if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+			table.insert(GUNS, v.Parent.Name) 
+		end
+	end
+elseif roleplaysettings=="Possible ACS Guns" then
+	game.StarterGui:SetCore("SendNotification", {Title = "Aviso!"; Text = "NÃ£o foi detectado um sistema ACS neste jogo."; Icon = "rbxassetid://10455493610"; Duration = 5;})
+end
+
+
+function getACSVersion()
+	for i, v in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+		if v:IsA('Configuration') and v.Name~="Framework" then
+			if (v:FindFirstChild('GameRules')) then
+				return "ACS 2.0.1"
+			elseif (v:FindFirstChild('Config')) then
+				return "ACS 1.7 Sequence"
+			else
+				return "VERSION NOT SUPPORTED"
+			end
+		end
+	end
+end
+local VERSIONACS = getACSVersion()
+print(tostring(VERSIONACS))
+
+function getConfig()
+	for i,v in next, game:GetService("ReplicatedStorage")["ACS_Engine"]:GetDescendants() do
+		if v:IsA("ModuleScript") and v.Name =="Config" then
+			return v
+		end
+	end
+end
+function getV()
+	for i, v in pairs(game.ReplicatedStorage:GetDescendants()) do
+		if v:IsA('Configuration') and v.Name ~="Framework" then
+			return v
+		end
+	end
+end
+local GETV = getV()
+local GETC = getConfig()
+print(tostring(GETV))
+
+
+local vu = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+	vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+	wait(1)
+	vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
+
+local SilentAimSettings = {
+	Enabled = false,
+
+	ClassName = "-",
+	ToggleKey = "K",
+
+	TeamCheck = false,
+	VisibleCheck = false, 
+	TargetPart = "Head",
+	SilentAimMethod = "Raycast",
+
+	FOVRadius = 360,
+	FOVVisible = false,
+	ShowSilentAimTarget = false, 
+
+	MouseHitPrediction = false,
+	MouseHitPredictionAmount = 1,
+	HitChance = 100
+}
+
+-- variables
+getgenv().SilentAimSettings = Settings
+local MainFileName = "KakahMenuSilent"
+local SelectedFile, FileToSave = "", ""
+
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+local GetChildren = game.GetChildren
+local GetPlayers = Players.GetPlayers
+local WorldToScreen = Camera.WorldToScreenPoint
+local WorldToViewportPoint = Camera.WorldToViewportPoint
+local GetPartsObscuringTarget = Camera.GetPartsObscuringTarget
+local FindFirstChild = game.FindFirstChild
+local RenderStepped = RunService.RenderStepped
+local GuiInset = GuiService.GetGuiInset
+local GetMouseLocation = UserInputService.GetMouseLocation
+
+local resume = coroutine.resume 
+local create = coroutine.create
+
+local ValidTargetParts = {"Head", "HumanoidRootPart"}
+local PredictionAmount = 0.165
+
+local mouse_box = Drawing.new("Square")
+mouse_box.Visible = false 
+mouse_box.ZIndex = 999 
+mouse_box.Color = Color3.fromRGB(54, 57, 241)
+mouse_box.Thickness = 20 
+mouse_box.Size = Vector2.new(20, 20)
+mouse_box.Filled = true 
+
+local fov_circle = Drawing.new("Circle")
+fov_circle.Thickness = 1
+fov_circle.NumSides = 100
+fov_circle.Radius = 180
+fov_circle.Filled = false
+fov_circle.Visible = false
+fov_circle.ZIndex = 999
+fov_circle.Transparency = 1
+fov_circle.Color = Color3.fromRGB(54, 57, 241)
+
+local ExpectedArguments = {
+	FindPartOnRayWithIgnoreList = {
+		ArgCountRequired = 3,
+		Args = {
+			"Instance", "Ray", "table", "boolean", "boolean"
+		}
+	},
+	FindPartOnRayWithWhitelist = {
+		ArgCountRequired = 3,
+		Args = {
+			"Instance", "Ray", "table", "boolean"
+		}
+	},
+	FindPartOnRay = {
+		ArgCountRequired = 2,
+		Args = {
+			"Instance", "Ray", "Instance", "boolean", "boolean"
+		}
+	},
+	Raycast = {
+		ArgCountRequired = 3,
+		Args = {
+			"Instance", "Vector3", "Vector3", "RaycastParams"
+		}
+	}
+}
+
+function CalculateChance(Percentage)
+	-- // Floor the percentage
+	Percentage = math.floor(Percentage)
+
+	-- // Get the chance
+	local chance = math.floor(Random.new().NextNumber(Random.new(), 0, 1) * 100) / 100
+
+	-- // Return
+	return chance <= Percentage / 100
+end
+
+
+--[[file handling]] do 
+	if not isfolder(MainFileName) then 
+		makefolder(MainFileName);
+	end
+
+	if not isfolder(string.format("%s/%s", MainFileName, tostring(game.PlaceId))) then 
+		makefolder(string.format("%s/%s", MainFileName, tostring(game.PlaceId)))
+	end
+end
+
+local Files = listfiles(string.format("%s/%s", "KakahMenuSilent", tostring(game.PlaceId)))
+
+-- functions
+local function GetFiles() -- credits to the linoria lib for this function, listfiles returns the files full path and its annoying
+	local out = {}
+	for i = 1, #Files do
+		local file = Files[i]
+		if file:sub(-4) == '.lua' then
+			-- i hate this but it has to be done ...
+
+			local pos = file:find('.lua', 1, true)
+			local start = pos
+
+			local char = file:sub(pos, pos)
+			while char ~= '/' and char ~= '\\' and char ~= '' do
+				pos = pos - 1
+				char = file:sub(pos, pos)
+			end
+
+			if char == '/' or char == '\\' then
+				table.insert(out, file:sub(pos + 1, start - 1))
+			end
+		end
+	end
+
+	return out
+end
+
+local function UpdateFile(FileName)
+	assert(FileName or FileName == "string", "oopsies");
+	writefile(string.format("%s/%s/%s.lua", MainFileName, tostring(game.PlaceId), FileName), HttpService:JSONEncode(SilentAimSettings))
+end
+
+local function LoadFile(FileName)
+	assert(FileName or FileName == "string", "oopsies");
+
+	local File = string.format("%s/%s/%s.lua", MainFileName, tostring(game.PlaceId), FileName)
+	local ConfigData = HttpService:JSONDecode(readfile(File))
+	for Index, Value in next, ConfigData do
+		SilentAimSettings[Index] = Value
+	end
+end
+
+local function getPositionOnScreen(Vector)
+	local Vec3, OnScreen = WorldToScreen(Camera, Vector)
+	return Vector2.new(Vec3.X, Vec3.Y), OnScreen
+end
+
+local function ValidateArguments(Args, RayMethod)
+	local Matches = 0
+	if #Args < RayMethod.ArgCountRequired then
+		return false
+	end
+	for Pos, Argument in next, Args do
+		if typeof(Argument) == RayMethod.Args[Pos] then
+			Matches = Matches + 1
+		end
+	end
+	return Matches >= RayMethod.ArgCountRequired
+end
+
+local function getDirection(Origin, Position)
+	return (Position - Origin).Unit * 1000
+end
+
+local function getMousePosition()
+	return GetMouseLocation(UserInputService)
+end
+
+local function IsPlayerVisible(Player)
+	local PlayerCharacter = Player.Character
+	local LocalPlayerCharacter = LocalPlayer.Character
+
+	if not (PlayerCharacter or LocalPlayerCharacter) then return end 
+
+	local PlayerRoot = FindFirstChild(PlayerCharacter, Options.TargetPart.Value) or FindFirstChild(PlayerCharacter, "HumanoidRootPart")
+
+	if not PlayerRoot then return end 
+
+	local CastPoints, IgnoreList = {PlayerRoot.Position, LocalPlayerCharacter, PlayerCharacter}, {LocalPlayerCharacter, PlayerCharacter}
+	local ObscuringObjects = #GetPartsObscuringTarget(Camera, CastPoints, IgnoreList)
+
+	return ((ObscuringObjects == 0 and true) or (ObscuringObjects > 0 and false))
+end
+
+local function getClosestPlayer()
+	if not Options.TargetPart.Value then return end
+	local Closest
+	local DistanceToMouse
+	for _, Player in next, GetPlayers(Players) do
+		if Player == LocalPlayer then continue end
+		if Toggles.TeamCheck.Value and Player.Team == LocalPlayer.Team then continue end
+
+		local Character = Player.Character
+		if not Character then continue end
+
+		if Toggles.VisibleCheck.Value and not IsPlayerVisible(Player) then continue end
+
+		local HumanoidRootPart = FindFirstChild(Character, "HumanoidRootPart")
+		local Humanoid = FindFirstChild(Character, "Humanoid")
+		if not HumanoidRootPart or not Humanoid or Humanoid and Humanoid.Health <= 0 then continue end
+
+		local ScreenPosition, OnScreen = getPositionOnScreen(HumanoidRootPart.Position)
+		if not OnScreen then continue end
+
+		local Distance = (getMousePosition() - ScreenPosition).Magnitude
+		if Distance <= (DistanceToMouse or Options.Radius.Value or 2000) then
+			Closest = ((Options.TargetPart.Value == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]]) or Character[Options.TargetPart.Value])
+			DistanceToMouse = Distance
+		end
+	end
+	return Closest
+end
+local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/Jxereas/UI-Libraries/main/notification_gui_library.lua", true))()
+
+-- Notification.new("error", "Error Heading", "Error body message.") 
+-- Notification.new("success", "Success Heading", "Success body message.")
+-- Notification.new("info", "Information Heading", "Information body message.")
+-- Notification.new("warning", "Warning Heading", "Warning body message.") 
+-- Notification.new("message", "Message Heading", "Message body message.") 
+
+
+-- \\ Combat Box //
+local repo = 'https://raw.githubusercontent.com/shlexware/Orion/main/source'
+local Library = loadstring(game:HttpGet(repo))()
+-- \\ Window //
+local Window = Library:MakeWindow({
+	Name = 'Kakah Menu Roleplay',
+	HidePremium = true
+})
+
+local CombatTab = Window:MakeTab({Name = "Combat",PremiumOnly =  false })
+
+local silent = CombatTab:AddSection({Name = "Opções do Silent"})
+
+
+
+silent:AddToggle({Name = "Equipe Check", Default = SilentAimSettings.TeamCheck,
+	Callback = function(Value)
+		SilentAimSettings.TeamCheck = Value 
+	end})
+
+
+silent:AddToggle({Name = "Visible Check", Default = SilentAimSettings.VisibleCheck,Callback = function(Value) SilentAimSettings.VisibleCheck = Value end})
+
+silent:AddDropdown({Name = "Target", Default = SilentAimSettings.TargetPart, Options = {"Head", "HumanoidRootPart", "Random"},Callback = function(Value) SilentAimSettings.TargetPart = Value  end})
+
+
+silent:AddSlider({
+	Name = 'Hit chance',
+	Min = 0,
+	Max = 100,
+	Default = 100,
+	Color = Color3.fromRGB(255,255,255),
+	Callback = function(Value)
+		SilentAimSettings.HitChance = Value
+	end
+})
+
+
+local FOV = CombatTab:AddSection({Name = "FOV"})
+
+
+FOV:AddToggle({
+	Name = "Show FOV Circle",
+	Callback = function(Value)
+		fov_circle.Visible = Value 
+		SilentAimSettings.FOVVisible = Value
+	end
+})
+
+FOV:AddSlider({
+	Name = "FOV Radius",
+	Min = 0,
+	Max = 360,
+	Default = 130, 
+	Callback = function(Value)
+		fov_circle.Radius = Value
+		SilentAimSettings.FOVRadius = Value
+	end
+})
+
+
+
+FOV:AddToggle({
+	Name = "Aim Target",
+	Default = false,
+	Callback = function(Value)
+		mouse_box.Visible = Value
+		SilentAimSettings.ShowSilentAimTarget = Value
+	end
+})
+
+
+-- \\ Tabs //
+local GameTab = Window:MakeTab({Name = "Guns Editor",PremiumOnly = false})
+local VisualsTab = Window:MakeTab({Name = "Visuals",PremiumOnly = false})
+local PlayerTab = Window:MakeTab({Name = "Player",PremiumOnly = false})
+local TrollTab = Window:MakeTab({Name = "Troll",PremiumOnly = false})
+local SettingsTab = Window:MakeTab({Name = "Settings",PremiumOnly = false})
+
+-- \\ Box //
+local GunMod = GameTab:AddSection({Name = "Gun Modifications"})
+
+GunMod:AddLabel('Only ACS - 2.0.1')
+
+local InfAmmoButton = GunMod:AddButton({
+	Name = "Inf Ammo",
+	Callback = function()
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.Ammo = math.huge;
+					SCRIPTMOD.AmmoInGun = math.huge;
+					SCRIPTMOD.StoredAmmo = math.huge;
+					SCRIPTMOD.MaxStoredAmmo = math.huge;
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.Ammo = math.huge;
+					SCRIPTMOD.AmmoInGun = math.huge;
+					SCRIPTMOD.StoredAmmo = math.huge;
+					SCRIPTMOD.MaxStoredAmmo = math.huge;
+				end
+			end
+		end
+	end
+})
+
+local NoSpreadButton = GunMod:AddButton({
+	Name = "No Spread", 
+	Callback = function()
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.MinSpread = 0.00001;
+					SCRIPTMOD.MaxSpread = 0.00002;
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.MinSpread = 0.00001;
+					SCRIPTMOD.MaxSpread = 0.00002;
+				end
+			end
+		end
+	end
+})
+local NoRecoilButton = GunMod:AddButton({
+	Name = "No Recoil", 
+	Callback = function()
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					--cam
+					SCRIPTMOD.camRecoil.camRecoilUp = {0,0};
+					SCRIPTMOD.camRecoil.camRecoilTilt = {0,0};
+					SCRIPTMOD.camRecoil.camRecoilLeft = {0,0};
+					SCRIPTMOD.camRecoil.camRecoilRight = {0,0};
+					--gun
+					SCRIPTMOD.gunRecoil.gunRecoilUp = {0,0};
+					SCRIPTMOD.gunRecoil.gunRecoilTilt = {0,0};
+					SCRIPTMOD.gunRecoil.gunRecoilLeft = {0,0};
+					SCRIPTMOD.gunRecoil.gunRecoilRight = {0,0};
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					--cam
+					SCRIPTMOD.camRecoil.camRecoilUp = {0,0};
+					SCRIPTMOD.camRecoil.camRecoilTilt = {0,0};
+					SCRIPTMOD.camRecoil.camRecoilLeft = {0,0};
+					SCRIPTMOD.camRecoil.camRecoilRight = {0,0};
+					--gun
+					SCRIPTMOD.gunRecoil.gunRecoilUp = {0,0};
+					SCRIPTMOD.gunRecoil.gunRecoilTilt = {0,0};
+					SCRIPTMOD.gunRecoil.gunRecoilLeft = {0,0};
+					SCRIPTMOD.gunRecoil.gunRecoilRight = {0,0};
+				end
+			end
+		end
+	end
+})
+local NoBulletDropButton = GunMod:AddButton({
+	Name = "No Bullet Drop",
+	Callback = function()
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.BulletDrop= 0
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.BulletDrop= 0
+				end
+			end
+		end
+	end
+})
+GunMod:AddToggle({
+	Name = "AntiBreak",
+	Default = false, 
+	Callback = function(Value)
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.CanBreak = Value;
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.CanBreak = Value;
+				end
+			end
+		end
+	end
+})
+
+GunMod:AddSlider({
+	Name = "Change Damage",
+	Min = 5, 
+	Max = 500, 
+	Default = 5,
+	Callback = function(Value)
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.MinDamage = Value
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.MinDamage = Value
+				end
+			end
+		end
+	end
+})
+
+GunMod:AddDropdown({
+	Name = "FireModeDrop",
+	Default = 1,
+	Options = {"Auto","Burst", "Semi"},
+	Callback = function(Value)
+		if Value == "Auto" then
+			for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+				if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+					if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+						MOD = v.Parent["TGIRoleplay_Settings"];
+						SCRIPTMOD = require(MOD);
+						SCRIPTMOD.ShootType = 3
+					else
+						MOD = v.Parent["ACS_Settings"];
+						SCRIPTMOD = require(MOD);
+						SCRIPTMOD.ShootType = 3
+					end
+				end
+			end
+		elseif Value == "Burst" then
+			for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+				if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+					if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+						MOD = v.Parent["TGIRoleplay_Settings"];
+						SCRIPTMOD = require(MOD);
+						SCRIPTMOD.ShootType = 2
+					else
+						MOD = v.Parent["ACS_Settings"];
+						SCRIPTMOD = require(MOD);
+						SCRIPTMOD.ShootType = 2
+					end
+				end
+			end
+		elseif Value == "Semi" then
+			for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+				if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+					if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+						MOD = v.Parent["TGIRoleplay_Settings"];
+						SCRIPTMOD = require(MOD);
+						SCRIPTMOD.ShootType = 1
+					else
+						MOD = v.Parent["ACS_Settings"];
+						SCRIPTMOD = require(MOD);
+						SCRIPTMOD.ShootType = 1
+					end
+				end
+			end
+		end
+	end
+})
+
+GunMod:AddTextbox({
+	Name = "BurstFireModeAmount", 
+	Default = "3",
+	TextDisappear = false,
+	Callback = function(Value)
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.BurstShot = Options.BurstFireModeAmount.Value
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.BurstShot = Options.BurstFireModeAmount.Value
+				end
+			end
+		end
+	end
+})
+
+local GunCustom = GameTab:AddSection({Name = "Gun Customize"})
+
+
+
+
+-- Gun Custom
+GunCustom:AddDropdown({
+	Name = "SelectGunDrop", 
+	Default = 1, 
+	Options = GUNS,
+	Callback = function(Value)
+		MOD = game:GetService("Players").LocalPlayer.Backpack[Value]["TGIRoleplay_Settings"];
+	end
+})
+GunCustom:AddDropdown({
+	Name = 'AttachScopeDrop', 
+	Default = 1,
+	Options = {"Acog","TA33 Acog", "PM II"}, 
+	Callback = function(Value)
+
+		if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+			MOD = game:GetService("Players").LocalPlayer.Backpack[Options.SelectGunDrop.Value]["TGIRoleplay_Settings"];
+		else
+			MOD = game:GetService("Players").LocalPlayer.Backpack[Options.SelectGunDrop.Value]["ACS_Settings"];
+		end
+		SCRIPTMOD = require(MOD);
+		SCRIPTMOD.SightAtt = "";
+		SCRIPTMOD.SightAtt = Value;
+	end
+})
+
+GunCustom:AddDropdown({
+	Name = "AttachBarrelDrop",
+	Default = 1, 
+	Options = {"Suppressor","Flash Hider"}, 
+	Callback = function(Value)
+		if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+			MOD = game:GetService("Players").LocalPlayer.Backpack[GUNS]["TGIRoleplay_Settings"];
+		else
+			MOD = game:GetService("Players").LocalPlayer.Backpack[GUNS]["ACS_Settings"];
+		end
+		SCRIPTMOD = require(MOD);
+		SCRIPTMOD.SightAtt = "";
+		SCRIPTMOD.SightAtt = Value;
+	end
+})
+GunCustom:AddDropdown({
+	Name = "AttachOthersUtiliesDrop",
+	Default = 1,
+	Options = {"Laser","Bipod", "AN PEQ"}, 
+	Callback = function(Value)
+		if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+			MOD = game:GetService("Players").LocalPlayer.Backpack[GUNS]["TGIRoleplay_Settings"];
+		else
+			MOD = game:GetService("Players").LocalPlayer.Backpack[GUNS]["ACS_Settings"];
+		end
+		SCRIPTMOD = require(MOD);
+		SCRIPTMOD.SightAtt = "";
+		SCRIPTMOD.SightAtt = Value;
+	end
+})
+
+GunCustom:AddButton({
+	Name = "Unequip all utilities",
+	Callback = function()
+		if game.PlaceId == 9483667454 or 6911111094 then
+			MOD = game:GetService("Players").LocalPlayer.Backpack[GUNS]["TGIRoleplay_Settings"];
+		else
+			MOD = game:GetService("Players").LocalPlayer.Backpack[GUNS]["ACS_Settings"];
+		end
+		SCRIPTMOD = require(MOD);
+		SCRIPTMOD.SightAtt = "";
+		SCRIPTMOD.BarrelAtt = "";
+		SCRIPTMOD.OtherAtt = "";
+	end
+})
+
+-- Visuals
+local CharacterTab = PlayerTab:AddSection({Name = 'Character'})
+local EspBox = VisualsTab:AddSection({Name = 'ESP'})
+local CombatVisuals = VisualsTab:AddSection({Name = 'Combat Visuals'})
+local MenuBox = VisualsTab:AddSection({Name = 'Menu Visuals'})
+local CrosshairBox = VisualsTab:AddSection({Name = 'CrossHair'})
+local ServerTab = TrollTab:AddSection({Name = 'Server'})
+local PlayersTab = TrollTab:AddSection({Name = 'Players'})
+local MenuSettingsBox = SettingsTab:AddSection({Name = 'Menu Settings'})
+local MiscBox = SettingsTab:AddSection({Name = 'Misc'})
+
+local espLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Sirius/request/library/esp/esp.lua"))()
+espLibrary.whitelist = {}
+espLibrary.blacklist = {}
+EspBox:AddToggle({
+	Name = 'TeamESPtoggle', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.teamCheck = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'TeamColorEsp', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.teamColor = Value
+	end
+})
+EspBox:AddLabel('ESP Color')
+EspBox:AddColorpicker({
+	Name = 'ESPColorPicker', 
+	Default = Color3.fromRGB(37, 98, 255),
+	Callback = function(Value)
+
+		espLibrary.options.whitelistColor = Value
+		espLibrary.options.outOfViewArrowsColor = Value
+		espLibrary.options.outOfViewArrowsOutlineColor = Value
+		espLibrary.options.nameColor = Value
+		espLibrary.options.boxesColor = Value
+		espLibrary.options.boxFillColor = Value
+		espLibrary.options.healthBarsColor = Value
+		espLibrary.options.healthTextColor = Value
+		espLibrary.options.distanceColor = Value
+		espLibrary.options.tracerColor = Value
+		espLibrary.options.chamsFillColor = Value
+	end
+})
+
+EspBox:AddToggle({
+	Name = 'AtivarEsp', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.visible = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'Nome Players esp', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.names = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'outOfViewArrowsESPtoggle', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.outOfViewArrows = Value
+		espLibrary.options.outOfViewArrowsFilled = Value
+		espLibrary.options.outOfViewArrowsOutline  = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'DistanciaEsp', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.distance = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'HealthBar', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.healthBars = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'Texto da Vida esp', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.healthText = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'BoxESP', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.boxes = Value
+	end
+})
+EspBox:AddDropdown({
+	Name = 'tracerOriginDrop', 
+	Default = 1,
+	Options = {"Bottom", "Top", "Mouse"},
+	Callback = function(Value)
+		espLibrary.options.tracerOrigin = Value
+	end
+})
+EspBox:AddToggle({
+	Name = 'TracerESP', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.tracers = Value
+	end
+})
+
+EspBox:AddToggle({
+	Name = 'ESPToggle', 
+	Default = false, 
+	Callback = function(Value)
+		espLibrary.options.enabled = Value
+		espLibrary.options.visibleOnly = Value
+		print(espLibrary.options.enabled)
+		print(espLibrary.options.visibleOnly)
+	end
+})
+
+
+
+CombatVisuals:AddToggle({
+	Name = "WeaponModel",
+	Default = false,
+	Callback = function(Value)
+		g = Value
+		if g== true then
+			for i, v in pairs(game:GetService("ReplicatedStorage")["ACS_Engine"].GunModels:GetDescendants()) do
+				if v.ClassName=='Part' or v.ClassName=='UnionOperation'then
+					v.Color= Value
+					wait()
+				end
+			end
+		end
+	end
+})
+CombatVisuals:AddDropdown({
+	Name = 'WeaponMaterialDrop', 
+	Default = 1,
+	Options = {'SmoothPlastic', 'Wood', 'Slate', 'Concrete', 'CorrodedMetal', 'DiamondPlate', 'Foil', 'Grass', 'Ice', 'Marble', 'Granite', 'Brick', 'Pebble', 'Sand', 'Fabric', 'Plastic', 'Metal', 'WoodPlanks', 'Cobblestone', 'Air', 'Water', 'Rock', 'Glacier', 'Snow', 'Sandstone', 'Mud', 'Basalt', 'Ground', 'CrackedLava', 'Neon', 'Glass', 'Asphalt', 'LeafyGrass', 'Salt', 'Limestone', 'Pavement', 'ForceField'}, 
+	Callback = function(Value)
+		local g = true
+		if g==true then
+			for i, v in pairs(game:GetService("ReplicatedStorage")["ACS_Engine"].GunModels:GetDescendants()) do
+				if v.ClassName=='Part' or v.ClassName=='UnionOperation'then
+					v.Material= Value
+					wait()
+				end
+			end
+		end
+	end
+})
+
+CrosshairBox:AddToggle({
+	Name = 'HabilitarCrossair', 
+	Default = false,
+	Callback = function(Value)
+		for i, v in pairs(game:GetService("Players").LocalPlayer.Backpack:GetDescendants()) do
+			if v.Name == "ACS_Animations" and v.Parent.Name ~= "Knife" and v.Parent.Name ~= "M67" and v.Parent.Name ~= "Flashbang"  then
+				if game.PlaceId==9483667454 or game.PlaceId== 6911111094 then
+					MOD = v.Parent["TGIRoleplay_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.CrossHair= Value
+					SCRIPTMOD.CenterDot = Value
+				else
+					MOD = v.Parent["ACS_Settings"];
+					SCRIPTMOD = require(MOD);
+					SCRIPTMOD.CrossHair = Value
+					SCRIPTMOD.CenterDot = Value
+				end
+			end
+		end
+	end
+})
+
+-- Character Tab
+
+local modcharacter = GETC
+local requiredc = require(modcharacter);
+
+CharacterTab:AddSlider({
+	Name = 'Change WalkSpeed',
+	Default = 24,
+	Min = 0,
+	Max = 500,
+	Callback = function(Value)
+		requiredc.RunWalkSpeed = Value
+	end
+})
+
+CharacterTab:AddSlider({
+	Name = 'Alterar Tempo WalkSpeed',
+	Default = 24,
+	Min = 0,
+	Max = 500,
+	Callback = function(Value)
+		requiredc.CrouchWalkSpeed = Value
+	end
+})
+
+CharacterTab:AddSlider({
+	Name = 'Alterar JumpPower',
+	Default = 50,
+	Min = 0,
+	Max = 500,
+	Callback = function(Value)
+		game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
+	end
+})
+CharacterTab:AddSlider({
+	Name = 'Alterar Campo de Visão',
+	Default = 70,
+	Min = 70,
+	Max = 120,
+	Callback = function(Value)
+		game.Workspace.Camera.FieldOfView = Value
+	end
+})
+CharacterTab:AddSlider({
+	Name = 'Alterar Gravidade',
+	Default = 192,
+	Min = 0,
+	Max = 1000,
+	Callback = function(Value)
+		game.Workspace.Gravity = Value
+	end
+})
+CharacterTab:AddSlider({
+	Name = 'Alterar Hora Mundial',
+	Default = 12,
+	Min = 0,
+	Max = 23,
+	Callback = function(Value)
+		game.Lighting.ClockTime = Value
+	end
+})
+
+CharacterTab:AddToggle({
+	Name = "InfStaminaToggle",
+	Default = false,
+	Callback = function()
+		if requiredc.EnableStamina == true then
+			requiredc.EnableStamina = false;
+		else
+			requiredc.EnableStamina = true
+		end
+	end
+})
+CharacterTab:AddToggle({
+	Name = 'Remove JumpCooldown',
+	Default = false, 
+	Callback = function()
+		local OLDJUMP = requiredc.JumpCoolDown
+		if requiredc.JumpCoolDown ~= 0 then
+			requiredc.JumpCoolDown = 0;
+		else
+			requiredc.JumpCoolDown = OLDJUMP
+		end
+	end
+})
+CharacterTab:AddToggle({
+	Name = 'Remove FallDamage', 
+	Default = false,
+	Callback = function()
+		if requiredc.EnableFallDamage == true then
+			requiredc.EnableFallDamage = false;
+		else
+			requiredc.EnableFallDamage = true
+		end
+	end
+})
+CharacterTab:AddToggle({
+	Name = 'Anti Drown', 
+	Default = false,
+	Callback = function()
+		if requiredc.CanDrown == true then
+			requiredc.CanDrown = false;
+		else
+			requiredc.CanDrown = true
+		end
+	end
+})
+CharacterTab:AddToggle({
+	Name = 'BunnyHob', 
+	Default = false,
+	Callback = function()
+		if requiredc.AntiBunnyHop == true then
+			requiredc.AntiBunnyHop = false;
+		else
+			requiredc.AntiBunnyHop = true
+		end
+	end
+})
+
+
+
+ServerTab:AddButton({
+	Name = "Crash Server", 
+	Callback = function()
+
+		while true do
+			for i=1,10 do
+				GETV.Events.ServerBullet:FireServer(Vector3.new(0/0/0),Vector3.new(0/0/0))
+			end
+			task.wait()
+		end
+
+	end
+})
+
+ServerTab:AddButton({
+	Name = "Lag Server", 
+	Callback = function()
+
+		GETV.Events.ServerBullet:FireServer(Vector3.new(0/0/0),Vector3.new(0/0/0))
+
+	end
+})
+ServerTab:AddToggle({
+	Name = 'Loop Whizz Server', 
+	Default = false, 
+	Callback = function(Value)
+		while Value ==true do task.wait(0.1)
+			for i, player in pairs(game.Players:GetPlayers()) do
+				GETV.Events.Whizz:FireServer(player)
+			end
+		end
+	end
+})
+ServerTab:AddToggle({
+	Name = 'Loop Supress Server', 
+	Default = false, 
+	Callback = function(Value)
+		while Value == true do task.wait(0.1)
+			for i, player in pairs(game.Players:GetPlayers()) do
+				local ohInstance1 = player
+				local ohNumber2 = 1
+				GETV.Events.Suppression:FireServer(ohInstance1, ohNumber2)
+			end
+		end
+	end
+})
+--hiding it cus idk why it dont work
+--[[
+-- // Players
+PLR = {}
+for i, v in pairs(game.Players:GetPlayers()) do
+	if v.Name ~= game.Players.LocalPlayer.Name then
+		table.insert(PLR, v.Name) 
+	end
+end
+
+PlayersTab:AddDropdown({Name = 'SelectPlrDrop', Default = 1,Options = PLR})
+PlayersTab:AddToggle({
+Name = 'Loop Whizz Player', 
+Default = false, 
+Callback = function(Value)
+while Value ==true do task.wait(0.1)
+		while Value ==true do task.wait(0.05)
+			local args = {[1] = game:GetService("Players")[Target.Options]}
+			GETV.Events.Whizz:FireServer(unpack(args))
+		end
+	end
+	})
+	
+PlayersTab:AddToggle('SupressPLRToggle', {Text = 'Loop Supress Player', Default = false, Tooltip = 'Enable Supress Player.',})
+Toggles.WhizzPLRToggle:OnChanged(function()
+	while Toggles.WhizzPLRToggle.Value==true do task.wait(0.1)
+		while Toggles.SupressSERVERToggle.Value==true do task.wait(0.05)
+			local args = {[1] = game:GetService("Players")[Options.SelectPlrDrop.Value]}
+			GETV.Events.Whizz:FireServer(unpack(args))
+		end
+	end
+end)
+Toggles.SupressPLRToggle:OnChanged(function()
+	while Toggles.SupressSERVERToggle.Value==true do task.wait(0.05)
+		local ohInstance1 = game:GetService("Players")[Options.SelectPlrDrop.Value]
+		local ohNumber2 = 1
+		GETV.Events.Suppression:FireServer(ohInstance1, ohNumber2)
+	end
+end)
+--]]
+
+-- Settings
+
+MenuSettingsBox:AddButton({Name = "Unload", Callback = function() OrionLib:Destroy() end})
+MiscBox:AddLabel('Username: '.. game.Players.LocalPlayer.Name)
+MiscBox:AddLabel('UserID: '.. game.Players.LocalPlayer.UserId)
+MiscBox:AddLabel('Exploit: '..identifyexecutor())
+MiscBox:AddLabel('PlaceID: '..game.PlaceId)
+MiscBox:AddButton({
+	Name = "Rejoin",
+	Callback = function()
+		game:GetService("TeleportService"):Teleport(game.PlaceId, game.Players.LocalPlayer)
+	end
+})
+
+
+-- End Scripts
+
+resume(create(function()
+	RenderStepped:Connect(function()
+		if  Toggles.MousePosition.Value and Toggles.aim_Enabled.Value  then
+			if getClosestPlayer() then 
+				local Root = getClosestPlayer().Parent.PrimaryPart or getClosestPlayer()
+				local RootToViewportPoint, IsOnScreen = WorldToViewportPoint(Camera, Root.Position);
+
+				mouse_box.Visible = IsOnScreen
+				mouse_box.Position = Vector2.new(RootToViewportPoint.X, RootToViewportPoint.Y)
+			else 
+				mouse_box.Visible = false 
+				mouse_box.Position = Vector2.new()
+			end
+		end
+
+		if Toggles.Visible.Value then 
+			fov_circle.Visible = Toggles.Visible.Value
+			fov_circle.Color = Options.Color.Value
+			fov_circle.Position = workspace.CurrentCamera.ViewportSize / 2
+		end
+	end)
+end))
