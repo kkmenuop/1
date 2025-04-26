@@ -168,7 +168,7 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/U
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/UnlessDahell/FeariseHub/refs/heads/main/InterfaceManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "KakahMenu" .. " | ".."BlueLock : Rival".." | ".."[Version 3]",
+    Title = "FeariseHub" .. " | ".."BlueLock : Rival".." | ".."[Version 3]",
     SubTitle = "by KakahMenu",
     TabWidth = 160,
     Size =  Device, --UDim2.fromOffset(480, 360), --default size (580, 460)
